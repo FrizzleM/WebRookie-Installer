@@ -166,54 +166,136 @@ function makePercentLogger(prefix: string) {
 }
 
 async function fetchLatestRoqApk(): Promise<File> {
-  log("Checking latest Rookie-on-Quest release from GitHub…");
+  log("[ROQ] Step 2: Starting GitHub release lookup.");
 
   const latestUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
   const releasesUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
 
+  const githubHeaders = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+
+  log(`[ROQ] latestUrl=${latestUrl}`);
+  log(`[ROQ] releasesUrl=${releasesUrl}`);
+  log(`[ROQ] headers=${JSON.stringify(githubHeaders)}`);
+
+  const findApkAsset = (release: any) => {
+    const assets = Array.isArray(release?.assets) ? release.assets : [];
+    return assets.find((asset: any) =>
+      typeof asset?.name === "string"
+      && asset.name.toLowerCase().endsWith(".apk")
+      && typeof asset?.browser_download_url === "string"
+    );
+  };
+
+  const pickBestReleaseWithApk = (releases: any[]) => {
+    const candidates = releases.filter((release) => !release?.draft && !!findApkAsset(release));
+
+    const stable = candidates.find((release) => !release?.prerelease);
+    return stable ?? candidates[0] ?? null;
+  };
+
   let releaseData: any;
-  let response = await fetch(latestUrl, { headers: { Accept: "application/vnd.github+json" } });
+
+  log("[ROQ] Requesting /releases/latest...");
+  let response = await fetch(latestUrl, { headers: githubHeaders });
+  log(`[ROQ] /releases/latest status=${response.status} ok=${response.ok}`);
 
   if (!response.ok) {
-    log(`Latest release endpoint returned ${response.status}. Falling back to full release list…`);
-    response = await fetch(releasesUrl, { headers: { Accept: "application/vnd.github+json" } });
+    log(`[ROQ] /releases/latest failed (${response.status}). Falling back to /releases...`);
+
+    response = await fetch(releasesUrl, { headers: githubHeaders });
+    log(`[ROQ] /releases status=${response.status} ok=${response.ok}`);
+
     if (!response.ok) {
       throw new Error(`Could not fetch releases from GitHub (${response.status}).`);
     }
 
     const releases = await response.json();
+    log(`[ROQ] /releases payload type=${Array.isArray(releases) ? "array" : typeof releases}`);
+
     if (!Array.isArray(releases) || releases.length === 0) {
       throw new Error("No releases found for rookie-on-quest.");
     }
 
-    releaseData = releases[0];
+    log(`[ROQ] release count=${releases.length}`);
+
+    const candidateCount = releases.filter((release: any) => !release?.draft && !!findApkAsset(release)).length;
+    log(`[ROQ] releases with APK and not draft=${candidateCount}`);
+
+    releaseData = pickBestReleaseWithApk(releases);
+    if (!releaseData) {
+      throw new Error("No release with an APK asset was found.");
+    }
+
+    log(`[ROQ] selected fallback release tag=${releaseData?.tag_name ?? "(none)"} name=${releaseData?.name ?? "(none)"}`);
   } else {
     releaseData = await response.json();
+    log(`[ROQ] latest release tag=${releaseData?.tag_name ?? "(none)"} name=${releaseData?.name ?? "(none)"}`);
+
+    const latestAssets = Array.isArray(releaseData?.assets) ? releaseData.assets : [];
+    log(`[ROQ] latest release assets count=${latestAssets.length}`);
+
+    if (!findApkAsset(releaseData)) {
+      log("[ROQ] latest release has no APK asset. Falling back to scan /releases...");
+
+      const releasesResponse = await fetch(releasesUrl, { headers: githubHeaders });
+      log(`[ROQ] fallback /releases status=${releasesResponse.status} ok=${releasesResponse.ok}`);
+
+      if (!releasesResponse.ok) {
+        throw new Error(`Could not fetch releases from GitHub (${releasesResponse.status}).`);
+      }
+
+      const releases = await releasesResponse.json();
+      log(`[ROQ] fallback /releases payload type=${Array.isArray(releases) ? "array" : typeof releases}`);
+
+      if (!Array.isArray(releases) || releases.length === 0) {
+        throw new Error("No releases found for rookie-on-quest.");
+      }
+
+      log(`[ROQ] fallback release count=${releases.length}`);
+
+      const candidateCount = releases.filter((release: any) => !release?.draft && !!findApkAsset(release)).length;
+      log(`[ROQ] fallback releases with APK and not draft=${candidateCount}`);
+
+      releaseData = pickBestReleaseWithApk(releases);
+      if (!releaseData) {
+        throw new Error("No release with an APK asset was found.");
+      }
+
+      log(`[ROQ] selected scanned release tag=${releaseData?.tag_name ?? "(none)"} name=${releaseData?.name ?? "(none)"}`);
+    }
   }
 
   const releaseName = releaseData?.name || releaseData?.tag_name || "Unknown release";
-  const assets = Array.isArray(releaseData?.assets) ? releaseData.assets : [];
-
-  const apkAsset = assets.find((asset: any) =>
-    typeof asset?.name === "string"
-    && asset.name.toLowerCase().endsWith(".apk")
-    && typeof asset?.browser_download_url === "string"
-  );
+  const apkAsset = findApkAsset(releaseData);
 
   if (!apkAsset) {
     throw new Error("Latest release does not contain an APK asset.");
   }
 
-  log(`Latest release: ${releaseName}`);
-  log(`Downloading ${apkAsset.name}…`);
+  log(`[ROQ] using release: ${releaseName}`);
+  log(`[ROQ] selected APK asset: ${apkAsset.name}`);
+  log(`[ROQ] APK URL: ${apkAsset.browser_download_url}`);
+  log("[ROQ] Downloading APK binary...");
 
   const apkResponse = await fetch(apkAsset.browser_download_url);
+  log(`[ROQ] APK download status=${apkResponse.status} ok=${apkResponse.ok}`);
+
   if (!apkResponse.ok) {
     throw new Error(`Could not download APK asset (${apkResponse.status}).`);
   }
 
+  const contentLength = apkResponse.headers.get("content-length");
+  const contentType = apkResponse.headers.get("content-type");
+  log(`[ROQ] APK response headers content-length=${contentLength ?? "(none)"} content-type=${contentType ?? "(none)"}`);
+
   const blob = await apkResponse.blob();
+  log(`[ROQ] APK blob size=${blob.size} type=${blob.type || "(none)"}`);
+
   const type = blob.type || "application/vnd.android.package-archive";
+  log("[ROQ] APK file object created.");
   return new File([blob], apkAsset.name, { type });
 }
 
@@ -287,11 +369,22 @@ async function installApkFile(apkFile: File) {
 };
 
 (document.getElementById("install") as HTMLButtonElement).onclick = async () => {
+  log("[ROQ] Install button clicked.");
+
   try {
+    log("[ROQ] Verifying ADB connection before install...");
     ensureConnected();
+    log("[ROQ] Connection check passed.");
+
+    log("[ROQ] Fetching latest ROQ APK...");
     const apk = await fetchLatestRoqApk();
+    log(`[ROQ] fetchLatestRoqApk completed. name=${apk.name} size=${apk.size}`);
+
+    log("[ROQ] Starting APK install flow (push + pm install)...");
     await installApkFile(apk);
+    log("[ROQ] Install flow completed.");
   } catch (e) {
+    log("[ROQ] Install flow failed.");
     logErr(e);
   }
 };
