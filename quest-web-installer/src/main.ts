@@ -165,6 +165,28 @@ function makePercentLogger(prefix: string) {
   };
 }
 
+async function downloadGithubApkAsset(apkAsset: any, githubHeaders: Record<string, string>): Promise<Response> {
+  const assetApiUrl = typeof apkAsset?.url === "string" ? apkAsset.url : null;
+
+  if (assetApiUrl) {
+    log("[ROQ] Trying GitHub asset API download (CORS-safe path)...");
+    const apiResponse = await fetch(assetApiUrl, {
+      headers: {
+        ...githubHeaders,
+        Accept: "application/octet-stream",
+      },
+    });
+
+    if (apiResponse.ok) {
+      return apiResponse;
+    }
+
+    log(`[ROQ] Asset API download returned ${apiResponse.status}. Falling back to browser URL...`);
+  }
+
+  return fetch(apkAsset.browser_download_url);
+}
+
 async function fetchLatestRoqApk(): Promise<File> {
   log("[ROQ] Step 2: Starting GitHub release lookup.");
 
@@ -246,7 +268,7 @@ async function fetchLatestRoqApk(): Promise<File> {
   log(`[ROQ] APK URL: ${apkAsset.browser_download_url}`);
   log("[ROQ] Downloading APK binary...");
 
-  const apkResponse = await fetch(apkAsset.browser_download_url);
+  const apkResponse = await downloadGithubApkAsset(apkAsset, githubHeaders);
   log(`[ROQ] APK download status=${apkResponse.status} ok=${apkResponse.ok}`);
 
   if (!apkResponse.ok) {
