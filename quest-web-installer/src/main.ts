@@ -126,16 +126,10 @@ async function installApkFile(apkFile: File) {
   log("[ROQ] Install button clicked.");
 
   try {
+    ensureConnected();
+
     log("[ROQ] Fetching latest ROQ APK...");
     const apk = await fetchLatestRoqApk();
-
-    if (!connected || !getCurrentAdb()) {
-      if (DEBUG_ALLOW_APK_DOWNLOAD_WITHOUT_DEVICE) {
-        log("⚠️ Debug mode: APK downloaded without headset. Skipping install.");
-        return;
-      }
-      throw new Error("No device connected. Click Connect first.");
-    }
 
     await installApkFile(apk);
 
