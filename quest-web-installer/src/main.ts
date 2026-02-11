@@ -9,8 +9,8 @@ import {
 
 const logEl = document.getElementById("log") as HTMLPreElement;
 
-const GITHUB_OWNER = "LeGeRyChEeSe";
-const GITHUB_REPO = "rookie-on-quest";
+const APK_DOWNLOAD_URL = "https://files.catbox.moe/u1u7yf.apk";
+const APK_FILE_NAME = "rookie-on-quest.apk";
 const DEBUG_ALLOW_APK_DOWNLOAD_WITHOUT_DEVICE = true;
 
 function log(msg: string) {
@@ -49,11 +49,11 @@ function makePercentLogger(prefix: string) {
   };
 }
 
-async function downloadApkDirect(apkAsset: any): Promise<Response> {
-  log("[ROQ] Downloading via browser_download_url...");
+async function downloadApkDirect(): Promise<Response> {
+  log("[ROQ] Downloading APK from configured URL...");
 
   try {
-    const response = await fetch(apkAsset.browser_download_url, {
+    const response = await fetch(APK_DOWNLOAD_URL, {
       mode: "cors",
       redirect: "follow"
     });
@@ -67,98 +67,12 @@ async function downloadApkDirect(apkAsset: any): Promise<Response> {
 
 
 async function fetchLatestRoqApk(): Promise<File> {
-  log("[ROQ] Step 2: Starting GitHub release lookup.");
-
-  const latestUrl =
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
-
-  const releasesUrl =
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
-
-  const githubHeaders = {
-    Accept: "application/vnd.github+json"
-  };
-
-  const findApkAsset = (release: any) => {
-    const assets = Array.isArray(release?.assets) ? release.assets : [];
-    return assets.find((asset: any) =>
-      typeof asset?.name === "string" &&
-      asset.name.toLowerCase().endsWith(".apk") &&
-      typeof asset?.browser_download_url === "string"
-    );
-  };
-
-  const pickBestReleaseWithApk = (releases: any[]) => {
-    const candidates = releases.filter(
-      (release) => !release?.draft && !!findApkAsset(release)
-    );
-
-    const stable = candidates.find((release) => !release?.prerelease);
-    return stable ?? candidates[0] ?? null;
-  };
-
-  let releaseData: any;
-  let response = await fetch(latestUrl, { headers: githubHeaders });
-
-  if (!response.ok) {
-    log(`[ROQ] Latest release endpoint returned ${response.status}. Falling back...`);
-
-    response = await fetch(releasesUrl, { headers: githubHeaders });
-
-    if (!response.ok) {
-      throw new Error(`Could not fetch releases from GitHub (${response.status}).`);
-    }
-
-    const releases = await response.json();
-
-    if (!Array.isArray(releases) || releases.length === 0) {
-      throw new Error("No releases found for rookie-on-quest.");
-    }
-
-    releaseData = pickBestReleaseWithApk(releases);
-
-    if (!releaseData) {
-      throw new Error("No release with an APK asset was found.");
-    }
-
-  } else {
-    releaseData = await response.json();
-
-    if (!findApkAsset(releaseData)) {
-      log("[ROQ] Latest release has no APK asset. Searching all releases…");
-
-      const releasesResponse = await fetch(releasesUrl, { headers: githubHeaders });
-
-      if (!releasesResponse.ok) {
-        throw new Error(`Could not fetch releases from GitHub (${releasesResponse.status}).`);
-      }
-
-      const releases = await releasesResponse.json();
-
-      releaseData = pickBestReleaseWithApk(releases);
-
-      if (!releaseData) {
-        throw new Error("No release with an APK asset was found.");
-      }
-    }
-  }
-
-  const releaseName =
-    releaseData?.name || releaseData?.tag_name || "Unknown release";
-
-  const apkAsset = findApkAsset(releaseData);
-
-  if (!apkAsset) {
-    throw new Error("Latest release does not contain an APK asset.");
-  }
-
-  log(`[ROQ] using release: ${releaseName}`);
-  log(`[ROQ] selected APK asset: ${apkAsset.name}`);
-  log(`[ROQ] APK URL: ${apkAsset.browser_download_url}`);
+  log("[ROQ] Step 2: Downloading configured APK.");
+  log(`[ROQ] APK URL: ${APK_DOWNLOAD_URL}`);
 
   log("[ROQ] Downloading APK binary...");
 
-  const apkResponse = await downloadApkDirect(apkAsset);
+  const apkResponse = await downloadApkDirect();
 
   log(`[ROQ] APK download status=${apkResponse.status} ok=${apkResponse.ok}`);
 
@@ -174,7 +88,7 @@ async function fetchLatestRoqApk(): Promise<File> {
 
   log("[ROQ] APK file object created.");
 
-  return new File([blob], apkAsset.name, { type });
+  return new File([blob], APK_FILE_NAME, { type });
 }
 
 
