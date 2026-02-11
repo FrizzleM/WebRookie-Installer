@@ -12,6 +12,7 @@
       --border:#fff;
       --text:#fff;
       --muted:rgba(255,255,255,.75);
+      --disabled:rgba(255,255,255,.35);
       --radius:0;
     }
     *{box-sizing:border-box}
@@ -35,7 +36,13 @@
     }
     .section{padding:16px;border-bottom:1px solid var(--border)}
     .section:last-child{border-bottom:none}
-    .section.is-disabled .title{color:rgba(255,255,255,.5)}
+    .section.is-disabled{
+      color:var(--disabled);
+      pointer-events:none;
+      user-select:none;
+    }
+    .section.is-disabled .title{color:var(--disabled)}
+    .section.is-disabled .actions{opacity:.7}
     .title{font-size:15px;font-weight:700;margin-bottom:0}
     .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
     button{
@@ -56,6 +63,41 @@
       border-color:rgba(255,255,255,.55);
     }
     button:disabled:hover{background:transparent}
+
+    .progress-wrap{
+      padding:16px;
+      border-bottom:1px solid var(--border);
+    }
+    .progress-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:8px;
+      color:var(--muted);
+      font-size:13px;
+      font-weight:600;
+      letter-spacing:.02em;
+    }
+    progress{
+      width:100%;
+      height:22px;
+      border:1px solid var(--border);
+      background:transparent;
+      color:#fff;
+    }
+    progress::-webkit-progress-bar{background:transparent}
+    progress::-webkit-progress-value{background:#fff}
+    progress::-moz-progress-bar{background:#fff}
+
+    .latest-log{
+      margin-top:10px;
+      color:var(--text);
+      font-size:14px;
+      min-height:20px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
 
     pre{
       margin:0;
@@ -94,11 +136,20 @@
         </div>
       </div>
 
-      <div class="section" id="install-section">
+      <div class="section is-disabled" id="install-section" aria-disabled="true">
         <div class="title">2. Install Rookie-on-Quest</div>
         <div class="actions">
           <button id="install" type="button">Install Rookie-on-Quest</button>
         </div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-header">
+          <span>Progress</span>
+          <span id="progress-label">0%</span>
+        </div>
+        <progress id="progress" max="100" value="0"></progress>
+        <div id="latest-log" class="latest-log">Waiting for action...</div>
       </div>
 
       <details open>
