@@ -12,6 +12,9 @@ const connectBtn = document.getElementById("connect") as HTMLButtonElement;
 const disconnectBtn = document.getElementById("disconnect") as HTMLButtonElement;
 const installBtn = document.getElementById("install") as HTMLButtonElement;
 const installSection = document.getElementById("install-section") as HTMLDivElement;
+const progressEl = document.getElementById("progress") as HTMLProgressElement;
+const progressLabelEl = document.getElementById("progress-label") as HTMLSpanElement;
+const latestLogEl = document.getElementById("latest-log") as HTMLDivElement;
 
 const APK_DOWNLOAD_URL = "https://files.catbox.moe/u1u7yf.apk";
 const APK_FILE_NAME = "rookie-on-quest.apk";
@@ -21,6 +24,7 @@ function log(msg: string) {
   console.log(msg);
   logEl.textContent += msg + "\n";
   logEl.scrollTop = logEl.scrollHeight;
+  latestLogEl.textContent = msg;
 }
 
 function logErr(e: any) {
@@ -41,6 +45,13 @@ function updateInstallAvailability() {
   const isConnected = connected && !!getCurrentAdb();
   installBtn.disabled = !isConnected;
   installSection.classList.toggle("is-disabled", !isConnected);
+  installSection.setAttribute("aria-disabled", String(!isConnected));
+}
+
+function setProgress(percent: number) {
+  const clamped = Math.max(0, Math.min(100, Math.floor(percent)));
+  progressEl.value = clamped;
+  progressLabelEl.textContent = `${clamped}%`;
 }
 
 function sanitize(name: string): string {
@@ -52,6 +63,7 @@ function makePercentLogger(prefix: string) {
   return (sent: number, total: number) => {
     if (total <= 0) return;
     const pct = Math.floor((sent / total) * 100);
+    setProgress(pct);
     if (pct >= 100 || pct >= last + 5) {
       last = pct;
       log(`${prefix}: ${pct}%`);
@@ -171,6 +183,7 @@ disconnectBtn.onclick = async () => {
 
 installBtn.onclick = async () => {
   log("[ROQ] Install button clicked.");
+  setProgress(0);
 
   try {
     ensureConnected();
@@ -178,14 +191,18 @@ installBtn.onclick = async () => {
     log("[ROQ] Fetching latest ROQ APK...");
     const apk = await fetchLatestRoqApk();
 
+    setProgress(20);
     await installApkFile(apk);
 
+    setProgress(100);
     log("[ROQ] Install flow completed.");
 
   } catch (e) {
+    setProgress(0);
     log("[ROQ] Install flow failed.");
     logErr(e);
   }
 };
 
 updateInstallAvailability();
+setProgress(0);
