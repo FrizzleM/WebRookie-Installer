@@ -18,7 +18,7 @@ const latestLogEl = document.getElementById("latest-log") as HTMLDivElement;
 const appShellEl = document.getElementById("app-shell") as HTMLDivElement;
 const unsupportedModalEl = document.getElementById("unsupported-modal") as HTMLDivElement;
 
-const APK_DOWNLOAD_URL = "https://files.catbox.moe/u1u7yf.apk";
+const APK_DOWNLOAD_URL = "https://files.catbox.moe/qoihls.apk";
 const APK_FILE_NAME = "rookie-on-quest.apk";
 const isSupportedBrowser = window.isSecureContext && "usb" in navigator;
 
